@@ -1,49 +1,18 @@
 "use client"
 
 import { useState } from "react"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  TextField,
-  Button,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Box,
-  useMediaQuery,
-  createTheme,
-  ThemeProvider,
-  Card,
-  CardContent,
-  Typography,
-  IconButton,
-} from "@mui/material"
-import SearchIcon from "@mui/icons-material/Search"
-import RefreshIcon from "@mui/icons-material/Refresh"
-import MoreVertIcon from "@mui/icons-material/MoreVert"
-
-const theme = createTheme({
-  breakpoints: {
-    values: {
-      xs: 0,
-      sm: 600,
-      md: 960,
-      lg: 1280,
-      xl: 1920,
-    },
-  },
-})
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Search, RefreshCw, MoreVertical, Eye } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 const PropostasPage = () => {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"))
 
   const propostas = [
     { id: 1, cliente: "João Silva", data: "2024-01-20", valor: 1500, status: "Em análise" },
@@ -66,112 +35,135 @@ const PropostasPage = () => {
     )
   })
 
-  return (
-    <ThemeProvider theme={theme}>
-      <Box sx={{ p: 3 }}>
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: isMobile ? "column" : "row",
-            justifyContent: "space-between",
-            alignItems: isMobile ? "flex-start" : "center",
-            mb: 2,
-          }}
-        >
-          <TextField
-            label="Buscar Cliente"
-            variant="outlined"
-            size="small"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            sx={{ mb: isMobile ? 2 : 0, width: isMobile ? "100%" : "auto" }}
-          />
-          <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: "center" }}>
-            <FormControl sx={{ m: isMobile ? 1 : 0, minWidth: 120, mb: isMobile ? 2 : 0 }}>
-              <InputLabel id="status-filter-label">Status</InputLabel>
-              <Select
-                labelId="status-filter-label"
-                id="status-filter"
-                value={statusFilter}
-                label="Status"
-                onChange={(e) => setStatusFilter(e.target.value)}
-                size="small"
-              >
-                <MenuItem value="">Todos</MenuItem>
-                <MenuItem value="Em análise">Em análise</MenuItem>
-                <MenuItem value="Aprovada">Aprovada</MenuItem>
-                <MenuItem value="Reprovada">Reprovada</MenuItem>
-              </Select>
-            </FormControl>
-            <Button variant="outlined" startIcon={<SearchIcon />} sx={{ ml: isMobile ? 0 : 1, mb: isMobile ? 2 : 0 }}>
-              Buscar
-            </Button>
-            <IconButton aria-label="refresh">
-              <RefreshIcon />
-            </IconButton>
-          </Box>
-        </Box>
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "Aprovada":
+        return "bg-green-100 text-green-800 hover:bg-green-200"
+      case "Reprovada":
+        return "bg-red-100 text-red-800 hover:bg-red-200"
+      case "Em análise":
+        return "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
+      default:
+        return "bg-gray-100 text-gray-800 hover:bg-gray-200"
+    }
+  }
 
-        {isMobile ? (
-          <Box>
-            {filteredPropostas.map((proposta) => (
-              <Card key={proposta.id} sx={{ mb: 2 }}>
-                <CardContent>
-                  <Typography variant="h6" component="div">
-                    {proposta.cliente}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Data: {proposta.data}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Valor: R$ {proposta.valor}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Status: {proposta.status}
-                  </Typography>
-                  <Box mt={1} display="flex" justifyContent="flex-end">
-                    <Button size="small" variant="contained">
-                      Detalhes
-                    </Button>
-                  </Box>
-                </CardContent>
-              </Card>
-            ))}
-          </Box>
-        ) : (
-          <TableContainer component={Paper}>
-            <Table sx={{ minWidth: 650 }} aria-label="simple table">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Cliente</TableCell>
-                  <TableCell>Data</TableCell>
-                  <TableCell>Valor</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell align="right">Ações</TableCell>
+  return (
+    <div className="container mx-auto p-4 space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h1 className="text-2xl font-bold">Propostas</h1>
+
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Input
+              placeholder="Buscar cliente..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 w-full sm:w-64"
+            />
+          </div>
+
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-40">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="Em análise">Em análise</SelectItem>
+              <SelectItem value="Aprovada">Aprovada</SelectItem>
+              <SelectItem value="Reprovada">Reprovada</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button variant="outline" size="icon">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Mobile Cards */}
+      <div className="block md:hidden space-y-4">
+        {filteredPropostas.map((proposta) => (
+          <Card key={proposta.id}>
+            <CardHeader className="pb-3">
+              <div className="flex justify-between items-start">
+                <CardTitle className="text-lg">{proposta.cliente}</CardTitle>
+                <Badge className={getStatusColor(proposta.status)}>{proposta.status}</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Data:</span>
+                <span>{proposta.data}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Valor:</span>
+                <span className="font-medium">R$ {proposta.valor.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-end pt-2">
+                <Button size="sm" variant="outline">
+                  <Eye className="h-4 w-4 mr-2" />
+                  Detalhes
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Desktop Table */}
+      <div className="hidden md:block">
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Cliente</TableHead>
+                <TableHead>Data</TableHead>
+                <TableHead>Valor</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredPropostas.map((proposta) => (
+                <TableRow key={proposta.id}>
+                  <TableCell className="font-medium">{proposta.cliente}</TableCell>
+                  <TableCell>{proposta.data}</TableCell>
+                  <TableCell>R$ {proposta.valor.toLocaleString()}</TableCell>
+                  <TableCell>
+                    <Badge className={getStatusColor(proposta.status)}>{proposta.status}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>
+                          <Eye className="h-4 w-4 mr-2" />
+                          Ver detalhes
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
                 </TableRow>
-              </TableHead>
-              <TableBody>
-                {filteredPropostas.map((proposta) => (
-                  <TableRow key={proposta.id}>
-                    <TableCell component="th" scope="row">
-                      {proposta.cliente}
-                    </TableCell>
-                    <TableCell>{proposta.data}</TableCell>
-                    <TableCell>R$ {proposta.valor}</TableCell>
-                    <TableCell>{proposta.status}</TableCell>
-                    <TableCell align="right">
-                      <IconButton aria-label="more">
-                        <MoreVertIcon />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        )}
-      </Box>
-    </ThemeProvider>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      </div>
+
+      {filteredPropostas.length === 0 && (
+        <Card>
+          <CardContent className="text-center py-8">
+            <p className="text-gray-500">Nenhuma proposta encontrada.</p>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   )
 }
 
