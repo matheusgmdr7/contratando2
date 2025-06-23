@@ -240,10 +240,8 @@ export default function ClientesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {clientesFiltrados.map(
-                    (cliente) =>
-                      (
-                        <TableRow key={cliente.id}>
+                  {clientesFiltrados.map((cliente) => (
+                    <TableRow key={cliente.id}>
                       <TableCell className="font-medium">{cliente.nome}</TableCell>
                       <TableCell>
                         <div className="flex flex-col">
@@ -259,33 +257,15 @@ export default function ClientesPage() {
                       </TableCell>
                       <TableCell>
                         <Badge
-                          variant={
-                            cliente.status === "ativo"
-                              ? "success"
-                              : cliente.status === "inativo"
-                              ? "destructive"
-                              : "outline"
-                          }
-                          className={`${
+                          className={
                             cliente.status === "ativo"
                               ? "bg-green-100 text-green-800 hover:bg-green-100"
                               : cliente.status === "inativo"
-                              ? "bg-red-100 text-red-800 hover:bg-red-100"
-                              : "bg-yellow-100 text-yellow-800 hover:bg-yellow-100"
+                                ? "bg-red-100 text-red-800 hover:bg-red-100"
+                                : "bg-yellow-100 text-yellow-800 hover:bg-yellow-100"
                           }
-                          className={`${\
-                            cliente.status === "ativo"
-                              ? "bg-green-100 text-green-800 hover:bg-green-100"
-                              : cliente.status === "inativo"
-                              ? "bg-red-100 text-red-800 hover:bg-red-100"
-                              : "bg-yellow-100 text-yellow-800 hover:bg-yellow-100"
-                          }`}
                         >
-                          {cliente.status === "ativo"
-                            ? "Ativo"
-                            : cliente.status === "inativo"
-                            ? "Inativo"
-                            : "Pendente"}
+                          {cliente.status === "ativo" ? "Ativo" : cliente.status === "inativo" ? "Inativo" : "Pendente"}
                         </Badge>
                       </TableCell>
                       <TableCell>{new Date(cliente.data_cadastro).toLocaleDateString()}</TableCell>
@@ -298,8 +278,7 @@ export default function ClientesPage() {
                         </div>
                       </TableCell>
                     </TableRow>
-                      ),
-                  )}
+                  ))}
                 </TableBody>
               </Table>
             </div>
