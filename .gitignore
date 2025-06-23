@@ -35,5 +35,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Não ignorar package-lock.json
-!package-lock.json
+# Ignorar package-lock.json para evitar conflitos
+package-lock.json
