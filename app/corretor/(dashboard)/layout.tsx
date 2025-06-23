@@ -145,8 +145,8 @@ export default function CorretorDashboardLayout({
   return (
     <div className="flex min-h-screen flex-col">
       {/* Header */}
-      <header className="bg-[#168979] text-white p-3 flex items-center justify-between border-b border-[#13786a]/30 shadow-sm">
-        <div className="flex items-center gap-2">
+      <header className="bg-[#168979] text-white p-2 md:p-3 flex items-center justify-between border-b border-[#13786a]/30 shadow-sm h-12 md:h-14">
+        <div className="flex items-center gap-1 md:gap-2">
           <Button
             variant="ghost"
             size="icon"
@@ -155,17 +155,17 @@ export default function CorretorDashboardLayout({
           >
             <Menu className="h-5 w-5" />
           </Button>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 md:gap-2">
             <img
               src="https://i.ibb.co/sdXM3bth/Post-Feed-e-Logo-6.png"
               alt="Logo Contratandoplanos"
               className="h-7 w-auto"
             />
-            <h1 className="text-lg font-semibold tracking-tight">Corretor Digital</h1>
+            <h1 className="text-sm md:text-lg font-semibold tracking-tight">Corretor Digital</h1>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="hidden md:inline text-sm font-medium">{corretor.nome}</span>
+        <div className="flex items-center gap-1 md:gap-2">
+          <span className="hidden md:inline text-xs md:text-sm font-medium">{corretor.nome}</span>
           <Button variant="ghost" size="sm" className="text-white hover:bg-[#13786a]" onClick={handleLogout}>
             <LogOut className="h-4 w-4 mr-1" />
             <span className="hidden md:inline text-xs">Sair</span>
@@ -300,7 +300,7 @@ export default function CorretorDashboardLayout({
         </div>
 
         {/* Main Content */}
-        <main className="flex-1 p-4 md:p-5 overflow-x-auto bg-gray-50">{children}</main>
+        <main className="flex-1 p-2 md:p-5 overflow-x-auto bg-gray-50">{children}</main>
       </div>
     </div>
   )
