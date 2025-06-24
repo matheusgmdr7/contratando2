@@ -485,50 +485,117 @@ export default function NovaPropostaPage() {
     return { documentosUrls, documentosDependentesUrls }
   }
 
-  const enviarEmailParaCliente = async (propostaId: string, emailCliente: string, nomeCliente: string) => {
-    try {
-      console.log("Iniciando envio de email para cliente...")
+  // CORRIGIR: Função de upload para usar o bucket correto das propostas
+  const uploadDocumentosPropostas = async (propostaId: string) => {
+    console.log("📤 INICIANDO UPLOAD DE DOCUMENTOS - BUCKET PROPOSTAS")
+    console.log("=".repeat(60))
+    console.log("📋 Proposta ID:", propostaId)
 
-      // Criar link único para o cliente completar a proposta
-      const linkProposta = `${window.location.origin}/proposta-digital/completar/${propostaId}`
+    const documentosUrls: { [key: string]: string } = {}
+    const documentosDependentesUrls: { [key: string]: { [key: string]: string } } = {}
 
-      // Usar o serviço de email
-      const emailEnviado = await enviarEmailPropostaCliente(emailCliente, nomeCliente, linkProposta, corretor.nome)
+    // BUCKET CORRETO para propostas (mesmo usado pelas propostas digitais)
+    const BUCKET_NAME = "documentos_propostas"
 
-      console.log("Resultado do envio de email:", emailEnviado)
-      return emailEnviado
-    } catch (error) {
-      console.error("Erro ao enviar email:", error)
-      return false
+    // Verificar se o bucket existe
+    console.log(`📦 Verificando bucket: ${BUCKET_NAME}`)
+
+    const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets()
+
+    if (bucketsError) {
+      console.error("❌ Erro ao listar buckets:", bucketsError)
+      throw new Error("Erro ao acessar storage: " + bucketsError.message)
     }
+
+    const bucketExists = buckets?.some((bucket) => bucket.name === BUCKET_NAME)
+
+    if (!bucketExists) {
+      console.error(`❌ Bucket ${BUCKET_NAME} não encontrado`)
+      console.log("📋 Buckets disponíveis:", buckets?.map((b) => b.name).join(", "))
+      throw new Error(`Bucket ${BUCKET_NAME} não está configurado`)
+    }
+
+    console.log(`✅ Bucket ${BUCKET_NAME} encontrado e acessível`)
+
+    // Upload dos documentos do titular
+    console.log("📄 Fazendo upload dos documentos do titular...")
+    for (const [key, file] of Object.entries(documentosUpload)) {
+      if (file) {
+        try {
+          console.log(`   📤 Uploading ${key}: ${file.name}`)
+
+          const fileName = `propostas/${propostaId}/titular_${key}_${Date.now()}.${file.name.split(".").pop()}`
+
+          const { data, error } = await supabase.storage.from(BUCKET_NAME).upload(fileName, file, {
+            cacheControl: "3600",
+            upsert: false,
+          })
+
+          if (error) {
+            console.error(`❌ Erro no upload de ${key}:`, error)
+            throw error
+          }
+
+          console.log(`   ✅ Upload de ${key} concluído:`, data.path)
+
+          // Obter URL pública
+          const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(fileName)
+
+          documentosUrls[key] = urlData.publicUrl
+          console.log(`   🔗 URL gerada para ${key}:`, urlData.publicUrl)
+        } catch (error) {
+          console.error(`❌ Erro ao fazer upload do documento ${key}:`, error)
+          // Continuar com outros documentos mesmo se um falhar
+        }
+      }
+    }
+
+    // Upload dos documentos dos dependentes
+    console.log("👨‍👩‍👧‍👦 Fazendo upload dos documentos dos dependentes...")
+    for (const [dependentIndex, docs] of Object.entries(documentosDependentesUpload)) {
+      console.log(`   📂 Dependente ${dependentIndex}:`)
+      documentosDependentesUrls[dependentIndex] = {}
+
+      for (const [key, file] of Object.entries(docs)) {
+        if (file) {
+          try {
+            console.log(`      📤 Uploading ${key}: ${file.name}`)
+
+            const fileName = `propostas/${propostaId}/dependente_${dependentIndex}_${key}_${Date.now()}.${file.name.split(".").pop()}`
+
+            const { data, error } = await supabase.storage.from(BUCKET_NAME).upload(fileName, file, {
+              cacheControl: "3600",
+              upsert: false,
+            })
+
+            if (error) {
+              console.error(`❌ Erro no upload de ${key} do dependente ${dependentIndex}:`, error)
+              throw error
+            }
+
+            console.log(`      ✅ Upload de ${key} concluído:`, data.path)
+
+            // Obter URL pública
+            const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(fileName)
+
+            documentosDependentesUrls[dependentIndex][key] = urlData.publicUrl
+            console.log(`      🔗 URL gerada para ${key}:`, urlData.publicUrl)
+          } catch (error) {
+            console.error(`❌ Erro ao fazer upload do documento ${key} do dependente ${dependentIndex}:`, error)
+            // Continuar com outros documentos mesmo se um falhar
+          }
+        }
+      }
+    }
+
+    console.log("📊 RESUMO DO UPLOAD:")
+    console.log(`   Documentos titular: ${Object.keys(documentosUrls).length}`)
+    console.log(`   Dependentes com documentos: ${Object.keys(documentosDependentesUrls).length}`)
+
+    return { documentosUrls, documentosDependentesUrls }
   }
 
-  const carregarDescricaoProduto = async (produtoId: string) => {
-    try {
-      console.log("🔍 Carregando descrição do produto:", produtoId)
-
-      const { data: produto, error } = await supabase
-        .from("produtos_corretores")
-        .select("nome, descricao, operadora, tipo")
-        .eq("id", produtoId)
-        .single()
-
-      if (error) {
-        console.error("❌ Erro ao carregar produto:", error)
-        return
-      }
-
-      if (produto) {
-        console.log("✅ Produto carregado:", produto)
-        // Armazenar dados do produto para usar no envio
-        setProdutoSelecionado(produto)
-      }
-    } catch (error) {
-      console.error("❌ Erro ao carregar descrição do produto:", error)
-    }
-  }
-
-  // CORRIGIR: Usar BIGINT em vez de UUID para o ID e salvar documentos corretamente
+  // CORRIGIR: Usar a tabela 'propostas' em vez de 'propostas_corretores'
   const onSubmit = async (data: FormValues) => {
     if (!corretor?.id) {
       toast.error("Você precisa estar logado para criar uma proposta.")
@@ -563,7 +630,7 @@ export default function NovaPropostaPage() {
 
     setEnviando(true)
     try {
-      console.log("🚀 INICIANDO PROCESSO DE CRIAÇÃO DE PROPOSTA - VERSÃO CORRIGIDA")
+      console.log("🚀 INICIANDO PROCESSO DE CRIAÇÃO DE PROPOSTA - USANDO TABELA PROPOSTAS")
       console.log("=".repeat(70))
 
       // Converte o valor para número
@@ -577,61 +644,54 @@ export default function NovaPropostaPage() {
       if (data.numero) enderecoCompleto += `, ${data.numero}`
       if (data.complemento) enderecoCompleto += `, ${data.complemento}`
 
-      // CORRIGIR: Dados da proposta com campos corretos
+      // Gerar ID único para a proposta
+      const propostaId = crypto.randomUUID()
+
+      // CORRIGIR: Dados da proposta para a tabela 'propostas' (mesmo formato que funciona)
       const dadosProposta = {
+        id: propostaId,
         corretor_id: corretor.id,
-        cliente: data.nome,
-        email_cliente: data.email,
-        whatsapp_cliente: data.telefone,
-        produto: produtoSelecionado?.nome || "Produto não identificado",
+        corretor_nome: corretor.nome,
+        modelo_id: data.template_id,
+        template_titulo: templates.find((t) => t.id === data.template_id)?.titulo || "Modelo não identificado",
+        nome_cliente: data.nome,
+        email: data.email,
+        telefone: data.telefone,
+        whatsapp: data.telefone,
+        cpf: data.cpf,
+        rg: data.rg,
+        orgao_emissor: data.orgao_emissor,
+        data_nascimento: data.data_nascimento,
+        cns: data.cns,
+        nome_mae: data.nome_mae,
+        sexo: data.sexo,
+        endereco: enderecoCompleto,
+        numero: data.numero,
+        complemento: data.complemento,
+        bairro: data.bairro,
+        cidade: data.cidade,
+        estado: data.estado,
+        cep: data.cep,
+        tipo_cobertura: data.cobertura,
+        tipo_acomodacao: data.acomodacao,
+        codigo_plano: data.sigla_plano,
+        valor_plano: valorNumerico,
+        produto_id: data.produto_id,
         produto_nome: produtoSelecionado?.nome || "",
-        produto_descricao: produtoSelecionado?.descricao || null, // NOVO
-        produto_operadora: produtoSelecionado?.operadora || null, // NOVO
-        produto_tipo: produtoSelecionado?.tipo || null, // NOVO
-        plano_nome: `${produtoSelecionado?.nome || ""} - ${data.sigla_plano}`,
-        valor_proposta: valorNumerico,
-        comissao: 0, // Será calculado posteriormente
-        status: "pendente",
-        data: new Date().toISOString(),
+        status: "pendente", // Status inicial
+        tem_dependentes: data.tem_dependentes,
+        dependentes_dados: data.tem_dependentes ? JSON.stringify(data.dependentes) : "[]",
+        observacoes: data.observacoes,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-
-        // Dados adicionais do cliente
-        cpf_cliente: data.cpf,
-        data_nascimento_cliente: data.data_nascimento,
-        endereco_cliente: enderecoCompleto,
-        cidade_cliente: data.cidade,
-        estado_cliente: data.estado,
-        cep_cliente: data.cep,
-
-        // Dados do plano
-        cobertura: data.cobertura,
-        acomodacao: data.acomodacao,
-        codigo_plano: data.sigla_plano,
-
-        // Dados adicionais
-        observacoes: data.observacoes,
-        tem_dependentes: data.tem_dependentes,
-        quantidade_dependentes: data.tem_dependentes ? data.dependentes.length : 0,
-
-        // Dados pessoais adicionais
-        rg_cliente: data.rg,
-        orgao_emissor_cliente: data.orgao_emissor,
-        cns_cliente: data.cns,
-        nome_mae_cliente: data.nome_mae,
-        sexo_cliente: data.sexo,
-
-        // NOVO: Campos para controle de documentos
-        documentos_enviados: true,
-        data_upload_documentos: new Date().toISOString(),
       }
 
-      console.log("💾 Salvando proposta na tabela propostas_corretores...")
+      console.log("💾 Salvando proposta na tabela 'propostas'...")
       console.log("📋 Dados da proposta:", dadosProposta)
 
-      // Inserir na tabela propostas_corretores (sem especificar ID)
+      // Inserir na tabela 'propostas' (mesma que funciona para propostas digitais)
       const { data: novaProposta, error: propostaError } = await supabase
-        .from("propostas_corretores")
+        .from("propostas")
         .insert([dadosProposta])
         .select()
         .single()
@@ -649,20 +709,21 @@ export default function NovaPropostaPage() {
         throw new Error("Proposta não foi salva corretamente - ID não retornado")
       }
 
-      // CORRIGIR: Upload de documentos com bucket correto
+      // CORRIGIR: Upload de documentos com bucket correto para propostas
       console.log("📤 Iniciando upload de documentos...")
-      const { documentosUrls, documentosDependentesUrls } = await uploadDocumentos(novaProposta.id.toString())
+      const { documentosUrls, documentosDependentesUrls } = await uploadDocumentosPropostas(novaProposta.id.toString())
 
       console.log("📊 Resultado do upload:")
       console.log("   Documentos titular:", Object.keys(documentosUrls).length)
       console.log("   Documentos dependentes:", Object.keys(documentosDependentesUrls).length)
 
-      // Salvar dependentes se houver
+      // Salvar dependentes se houver (na tabela 'dependentes' padrão)
       if (data.tem_dependentes && data.dependentes.length > 0) {
         console.log("👨‍👩‍👧‍👦 Salvando dependentes...")
 
         const dependentesData = data.dependentes.map((dep, index) => ({
-          proposta_corretor_id: novaProposta.id, // Usar o ID gerado automaticamente
+          id: crypto.randomUUID(),
+          proposta_id: novaProposta.id, // Usar o ID da proposta
           nome: dep.nome,
           cpf: dep.cpf,
           rg: dep.rg,
@@ -679,11 +740,10 @@ export default function NovaPropostaPage() {
           sexo: dep.sexo,
           orgao_emissor: dep.orgao_emissor,
           created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         }))
 
-        const { error: dependentesError } = await supabase
-          .from("dependentes_propostas_corretores")
-          .insert(dependentesData)
+        const { error: dependentesError } = await supabase.from("dependentes").insert(dependentesData)
 
         if (dependentesError) {
           console.error("❌ Erro ao salvar dependentes:", dependentesError)
@@ -694,7 +754,7 @@ export default function NovaPropostaPage() {
         }
       }
 
-      // CORRIGIR: Atualizar com URLs dos documentos usando campos corretos
+      // CORRIGIR: Atualizar com URLs dos documentos
       console.log("🔗 Atualizando proposta com URLs dos documentos...")
 
       const updateData: any = {
@@ -704,24 +764,13 @@ export default function NovaPropostaPage() {
       // Adicionar URLs dos documentos se houver
       if (Object.keys(documentosUrls).length > 0) {
         updateData.documentos_urls = documentosUrls
-
-        // Também salvar em campos individuais para compatibilidade
-        if (documentosUrls.rg_frente) updateData.rg_frente_url = documentosUrls.rg_frente
-        if (documentosUrls.rg_verso) updateData.rg_verso_url = documentosUrls.rg_verso
-        if (documentosUrls.cpf) updateData.cpf_url = documentosUrls.cpf
-        if (documentosUrls.comprovante_residencia)
-          updateData.comprovante_residencia_url = documentosUrls.comprovante_residencia
-        if (documentosUrls.cns) updateData.cns_url = documentosUrls.cns
       }
 
       if (Object.keys(documentosDependentesUrls).length > 0) {
         updateData.documentos_dependentes_urls = documentosDependentesUrls
       }
 
-      const { error: updateError } = await supabase
-        .from("propostas_corretores")
-        .update(updateData)
-        .eq("id", novaProposta.id)
+      const { error: updateError } = await supabase.from("propostas").update(updateData).eq("id", novaProposta.id)
 
       if (updateError) {
         console.error("⚠️ Erro ao atualizar URLs dos documentos:", updateError)
@@ -764,6 +813,49 @@ export default function NovaPropostaPage() {
       toast.error("Erro ao criar proposta. Tente novamente.")
     } finally {
       setEnviando(false)
+    }
+  }
+
+  const enviarEmailParaCliente = async (propostaId: string, emailCliente: string, nomeCliente: string) => {
+    try {
+      console.log("Iniciando envio de email para cliente...")
+
+      // Criar link único para o cliente completar a proposta
+      const linkProposta = `${window.location.origin}/proposta-digital/completar/${propostaId}`
+
+      // Usar o serviço de email
+      const emailEnviado = await enviarEmailPropostaCliente(emailCliente, nomeCliente, linkProposta, corretor.nome)
+
+      console.log("Resultado do envio de email:", emailEnviado)
+      return emailEnviado
+    } catch (error) {
+      console.error("Erro ao enviar email:", error)
+      return false
+    }
+  }
+
+  const carregarDescricaoProduto = async (produtoId: string) => {
+    try {
+      console.log("🔍 Carregando descrição do produto:", produtoId)
+
+      const { data: produto, error } = await supabase
+        .from("produtos_corretores")
+        .select("nome, descricao, operadora, tipo")
+        .eq("id", produtoId)
+        .single()
+
+      if (error) {
+        console.error("❌ Erro ao carregar produto:", error)
+        return
+      }
+
+      if (produto) {
+        console.log("✅ Produto carregado:", produto)
+        // Armazenar dados do produto para usar no envio
+        setProdutoSelecionado(produto)
+      }
+    } catch (error) {
+      console.error("❌ Erro ao carregar descrição do produto:", error)
     }
   }
 
