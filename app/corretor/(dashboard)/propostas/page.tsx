@@ -1,170 +1,210 @@
 "use client"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, RefreshCw, MoreVertical, Eye } from "lucide-react"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { AlertCircle, Search, Download, FileText } from "lucide-react"
+import { buscarPropostasPorCorretor } from "@/services/propostas-corretores-service"
+import { verificarAutenticacao } from "@/services/auth-corretores-simples"
+import { Spinner } from "@/components/ui/spinner"
+import { formatarMoeda } from "@/utils/formatters"
+import { useRouter } from "next/navigation"
 
-const PropostasPage = () => {
+export default function CorretorPropostasPage() {
+  const [propostas, setPropostas] = useState([])
   const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState("")
+  const [filtroStatus, setFiltroStatus] = useState("Todos")
+  const [carregando, setCarregando] = useState(true)
+  const [erro, setErro] = useState(null)
+  const router = useRouter()
 
-  const propostas = [
-    { id: 1, cliente: "João Silva", data: "2024-01-20", valor: 1500, status: "Em análise" },
-    { id: 2, cliente: "Maria Souza", data: "2024-01-22", valor: 2200, status: "Aprovada" },
-    { id: 3, cliente: "Carlos Pereira", data: "2024-01-25", valor: 1800, status: "Reprovada" },
-    { id: 4, cliente: "Ana Oliveira", data: "2024-01-28", valor: 2500, status: "Em análise" },
-    { id: 5, cliente: "Ricardo Santos", data: "2024-01-30", valor: 3000, status: "Aprovada" },
-    { id: 6, cliente: "Isabela Costa", data: "2024-02-01", valor: 1200, status: "Reprovada" },
-    { id: 7, cliente: "Fernando Lima", data: "2024-02-03", valor: 2000, status: "Em análise" },
-    { id: 8, cliente: "Patricia Rocha", data: "2024-02-05", valor: 2800, status: "Aprovada" },
-    { id: 9, cliente: "Gustavo Mendes", data: "2024-02-07", valor: 1600, status: "Reprovada" },
-    { id: 10, cliente: "Juliana Nunes", data: "2024-02-10", valor: 2300, status: "Em análise" },
-  ]
+  useEffect(() => {
+    async function carregarDados() {
+      try {
+        setCarregando(true)
+        setErro(null)
 
-  const filteredPropostas = propostas.filter((proposta) => {
-    const searchTermLower = searchTerm.toLowerCase()
-    return (
-      proposta.cliente.toLowerCase().includes(searchTermLower) &&
-      (statusFilter === "" || proposta.status === statusFilter)
-    )
+        // Verificar autenticação
+        const { autenticado, corretor } = verificarAutenticacao()
+        if (!autenticado || !corretor) {
+          setErro("Usuário não autenticado. Por favor, faça login novamente.")
+          return
+        }
+
+        // Carregar propostas
+        const propostasData = await buscarPropostasPorCorretor(corretor.id)
+        setPropostas(propostasData)
+      } catch (error) {
+        console.error("Erro ao carregar dados:", error)
+        setErro("Não foi possível carregar os dados. Por favor, tente novamente.")
+      } finally {
+        setCarregando(false)
+      }
+    }
+
+    carregarDados()
+  }, [])
+
+  const propostasFiltradas = propostas.filter((proposta) => {
+    const matchSearch =
+      proposta.cliente?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      proposta.produto?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      proposta.email_cliente?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      proposta.whatsapp_cliente?.includes(searchTerm)
+
+    const matchStatus = filtroStatus === "Todos" || proposta.status === filtroStatus
+    return matchSearch && matchStatus
   })
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Aprovada":
-        return "bg-green-100 text-green-800 hover:bg-green-200"
-      case "Reprovada":
-        return "bg-red-100 text-red-800 hover:bg-red-200"
-      case "Em análise":
-        return "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
-      default:
-        return "bg-gray-100 text-gray-800 hover:bg-gray-200"
-    }
+  if (erro) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold">Propostas</h1>
+        </div>
+
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center p-6">
+            <div className="text-center space-y-4">
+              <AlertCircle className="h-12 w-12 text-red-500 mx-auto" />
+              <p className="text-red-500 font-medium">{erro}</p>
+              <Button onClick={() => window.location.reload()} className="bg-[#168979] hover:bg-[#13786a]">
+                Tentar novamente
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
-    <div className="container mx-auto p-4 space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-2xl font-bold">Propostas</h1>
+    <div className="space-y-5">
+      <div className="flex justify-between items-center border-b pb-3">
+        <h1 className="text-xl font-semibold tracking-tight">Propostas Recebidas</h1>
+        <Button
+          onClick={() => router.push("/corretor/propostas/nova")}
+          className="bg-[#168979] hover:bg-[#13786a] text-white"
+        >
+          <FileText className="mr-2 h-4 w-4" />
+          Nova Proposta
+        </Button>
+      </div>
 
-        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Buscar cliente..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 w-full sm:w-64"
-            />
+      <Card className="shadow-sm border-gray-200">
+        <CardHeader className="pb-2 pt-4">
+          <CardTitle className="text-base font-medium">Propostas enviadas pelos clientes</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row gap-4 mb-5">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Buscar por cliente, email, WhatsApp ou produto..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 h-9 text-sm"
+              />
+            </div>
+            <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+              <SelectTrigger className="w-full md:w-[180px] h-9 text-sm">
+                <SelectValue placeholder="Filtrar por status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Todos">Todos</SelectItem>
+                <SelectItem value="pendente">Pendentes</SelectItem>
+                <SelectItem value="aprovada">Aprovadas</SelectItem>
+                <SelectItem value="rejeitada">Rejeitadas</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-40">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
-              <SelectItem value="Em análise">Em análise</SelectItem>
-              <SelectItem value="Aprovada">Aprovada</SelectItem>
-              <SelectItem value="Reprovada">Reprovada</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Button variant="outline" size="icon">
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Mobile Cards */}
-      <div className="block md:hidden space-y-4">
-        {filteredPropostas.map((proposta) => (
-          <Card key={proposta.id}>
-            <CardHeader className="pb-3">
-              <div className="flex justify-between items-start">
-                <CardTitle className="text-lg">{proposta.cliente}</CardTitle>
-                <Badge className={getStatusColor(proposta.status)}>{proposta.status}</Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Data:</span>
-                <span>{proposta.data}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Valor:</span>
-                <span className="font-medium">R$ {proposta.valor.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-end pt-2">
-                <Button size="sm" variant="outline">
-                  <Eye className="h-4 w-4 mr-2" />
-                  Detalhes
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Desktop Table */}
-      <div className="hidden md:block">
-        <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Data</TableHead>
-                <TableHead>Valor</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredPropostas.map((proposta) => (
-                <TableRow key={proposta.id}>
-                  <TableCell className="font-medium">{proposta.cliente}</TableCell>
-                  <TableCell>{proposta.data}</TableCell>
-                  <TableCell>R$ {proposta.valor.toLocaleString()}</TableCell>
-                  <TableCell>
-                    <Badge className={getStatusColor(proposta.status)}>{proposta.status}</Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <Eye className="h-4 w-4 mr-2" />
-                          Ver detalhes
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50 hover:bg-gray-50">
+                  <TableHead className="font-medium text-xs text-gray-600">Cliente</TableHead>
+                  <TableHead className="font-medium text-xs text-gray-600">Contato</TableHead>
+                  <TableHead className="font-medium text-xs text-gray-600">Produto</TableHead>
+                  <TableHead className="font-medium text-xs text-gray-600">Data</TableHead>
+                  <TableHead className="font-medium text-xs text-gray-600">Status</TableHead>
+                  <TableHead className="font-medium text-xs text-gray-600">Comissão</TableHead>
+                  <TableHead className="font-medium text-xs text-gray-600">Ações</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
-      </div>
-
-      {filteredPropostas.length === 0 && (
-        <Card>
-          <CardContent className="text-center py-8">
-            <p className="text-gray-500">Nenhuma proposta encontrada.</p>
-          </CardContent>
-        </Card>
-      )}
+              </TableHeader>
+              <TableBody>
+                {carregando ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8">
+                      <div className="flex justify-center">
+                        <Spinner />
+                      </div>
+                      <p className="mt-2 text-sm text-gray-500">Carregando propostas...</p>
+                    </TableCell>
+                  </TableRow>
+                ) : propostasFiltradas.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-4 text-sm text-gray-500">
+                      {searchTerm || filtroStatus !== "Todos"
+                        ? "Nenhuma proposta encontrada com os filtros aplicados"
+                        : "Você ainda não possui propostas cadastradas"}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  propostasFiltradas.map((proposta) => (
+                    <TableRow key={proposta.id} className="text-sm">
+                      <TableCell className="font-medium">{proposta.cliente}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="text-xs text-gray-500">Email:</span>
+                          <span className="text-xs">{proposta.email_cliente || "-"}</span>
+                          <span className="text-xs text-gray-500 mt-1">WhatsApp:</span>
+                          <span className="text-xs">{proposta.whatsapp_cliente || "-"}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>{proposta.produto}</TableCell>
+                      <TableCell className="text-xs">
+                        {proposta.created_at
+                          ? new Date(proposta.created_at).toLocaleDateString("pt-BR")
+                          : proposta.data
+                            ? new Date(proposta.data).toLocaleDateString("pt-BR")
+                            : "-"}
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`px-1.5 py-0.5 rounded-sm text-xs ${
+                            proposta.status === "aprovada"
+                              ? "bg-green-100 text-green-800"
+                              : proposta.status === "rejeitada"
+                                ? "bg-red-100 text-red-800"
+                                : "bg-yellow-100 text-yellow-800"
+                          }`}
+                        >
+                          {proposta.status === "aprovada"
+                            ? "Aprovada"
+                            : proposta.status === "rejeitada"
+                              ? "Rejeitada"
+                              : "Pendente"}
+                        </span>
+                      </TableCell>
+                      <TableCell>{proposta.comissao > 0 ? formatarMoeda(proposta.comissao) : "-"}</TableCell>
+                      <TableCell>
+                        {proposta.documentos_propostas_corretores?.length > 0 && (
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                            <Download className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
-
-export default PropostasPage
