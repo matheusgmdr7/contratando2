@@ -83,7 +83,7 @@ export default function CorretorPropostasPage() {
   return (
     <div className="space-y-5">
       <div className="flex justify-between items-center border-b pb-3">
-        <h1 className="text-xl font-semibold tracking-tight">Propostas Recebidas</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Propostas Enviadas</h1>
         <Button
           onClick={() => router.push("/corretor/propostas/nova")}
           className="bg-[#168979] hover:bg-[#13786a] text-white"
@@ -95,7 +95,7 @@ export default function CorretorPropostasPage() {
 
       <Card className="shadow-sm border-gray-200">
         <CardHeader className="pb-2 pt-4">
-          <CardTitle className="text-base font-medium">Propostas enviadas pelos clientes</CardTitle>
+          <CardTitle className="text-base font-medium">Propostas enviadas para os clientes</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col md:flex-row gap-4 mb-5">
@@ -121,7 +121,8 @@ export default function CorretorPropostasPage() {
             </Select>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Tabela para desktop */}
+          <div className="overflow-x-auto md:block hidden">
             <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50 hover:bg-gray-50">
@@ -202,6 +203,85 @@ export default function CorretorPropostasPage() {
                 )}
               </TableBody>
             </Table>
+          </div>
+
+          {/* Cards para mobile */}
+          <div className="block md:hidden space-y-4">
+            {carregando ? (
+              <div className="text-center py-8">
+                <div className="flex justify-center">
+                  <Spinner />
+                </div>
+                <p className="mt-2 text-sm text-gray-500">Carregando propostas...</p>
+              </div>
+            ) : propostasFiltradas.length === 0 ? (
+              <div className="text-center py-4 text-sm text-gray-500">
+                {searchTerm || filtroStatus !== "Todos"
+                  ? "Nenhuma proposta encontrada com os filtros aplicados"
+                  : "Você ainda não possui propostas cadastradas"}
+              </div>
+            ) : (
+              propostasFiltradas.map((proposta) => (
+                <Card key={proposta.id} className="shadow-sm border-gray-200">
+                  <CardHeader>
+                    <CardTitle className="text-sm font-medium">{proposta.cliente}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid gap-2">
+                    <div>
+                      <span className="text-xs text-gray-500">Email:</span>
+                      <p className="text-xs">{proposta.email_cliente || "-"}</p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-gray-500">WhatsApp:</span>
+                      <p className="text-xs">{proposta.whatsapp_cliente || "-"}</p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-gray-500">Produto:</span>
+                      <p className="text-xs">{proposta.produto}</p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-gray-500">Data:</span>
+                      <p className="text-xs">
+                        {proposta.created_at
+                          ? new Date(proposta.created_at).toLocaleDateString("pt-BR")
+                          : proposta.data
+                            ? new Date(proposta.data).toLocaleDateString("pt-BR")
+                            : "-"}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-gray-500">Status:</span>
+                      <p>
+                        <span
+                          className={`px-1.5 py-0.5 rounded-sm text-xs ${
+                            proposta.status === "aprovada"
+                              ? "bg-green-100 text-green-800"
+                              : proposta.status === "rejeitada"
+                                ? "bg-red-100 text-red-800"
+                                : "bg-yellow-100 text-yellow-800"
+                          }`}
+                        >
+                          {proposta.status === "aprovada"
+                            ? "Aprovada"
+                            : proposta.status === "rejeitada"
+                              ? "Rejeitada"
+                              : "Pendente"}
+                        </span>
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-gray-500">Comissão:</span>
+                      <p className="text-xs">{proposta.comissao > 0 ? formatarMoeda(proposta.comissao) : "-"}</p>
+                    </div>
+                    {proposta.documentos_propostas_corretores?.length > 0 && (
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                        <Download className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
