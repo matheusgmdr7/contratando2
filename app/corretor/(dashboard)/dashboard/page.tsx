@@ -150,7 +150,13 @@ export default function CorretorDashboardPage() {
         const propostasAprovadas = propostasFiltradas.filter((p) => p.status === "aprovada").length
 
         // Calcular clientes únicos (baseado no email)
-        const clientesUnicos = new Set(propostasFiltradas.map((p) => p.email_cliente))
+        const clientesUnicos = new Set()
+        propostasFiltradas?.forEach((proposta) => {
+          // Apenas propostas APROVADAS contam como clientes ativos
+          if (proposta.status === "aprovada" && proposta.email_cliente) {
+            clientesUnicos.add(proposta.email_cliente)
+          }
+        })
         const clientesAtivos = clientesUnicos.size
 
         // Atualizar estatísticas
