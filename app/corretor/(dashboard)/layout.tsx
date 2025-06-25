@@ -257,7 +257,9 @@ export default function CorretorDashboardLayout({
               </Avatar>
               <div className="flex flex-col">
                 <span className="text-white text-sm font-medium">{corretor.nome || "Corretor"}</span>
-                <span className="text-xs text-blue-100/80">{corretor.email}</span>
+                <span className="text-xs text-blue-100/80 truncate max-w-[160px] block" title={corretor.email}>
+                  {corretor.email}
+                </span>
               </div>
             </div>
             <nav className="flex-1 px-2 pb-4 space-y-1">
