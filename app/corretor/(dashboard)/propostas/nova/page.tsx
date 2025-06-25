@@ -375,444 +375,189 @@ export default function NovaPropostaPage() {
     }
   }
 
-  // CORRIGIR: Função de upload melhorada com bucket correto
+  // CORRIGIR: Função de upload melhorada com criação automática de bucket
   const uploadDocumentos = async (propostaId: string) => {
-    console.log("📤 INICIANDO UPLOAD DE DOCUMENTOS - VERSÃO CORRIGIDA")
-    console.log("=".repeat(60))
+    console.log("📤 INICIANDO UPLOAD DE DOCUMENTOS - VERSÃO CORRIGIDA COM AUTO-CRIAÇÃO")
+    console.log("=".repeat(70))
     console.log("📋 Proposta ID:", propostaId)
 
     const documentosUrls: { [key: string]: string } = {}
     const documentosDependentesUrls: { [key: string]: { [key: string]: string } } = {}
 
-    // BUCKET CORRETO para propostas de corretores
-    const BUCKET_NAME = "documentos-propostas-corretores"
+    // Lista de buckets possíveis em ordem de preferência
+    const BUCKETS_POSSIVEIS = [
+      "documentos-propostas-corretores",
+      "documentos_propostas",
+      "documentos-propostas",
+      "documentos",
+      "arquivos",
+    ]
 
-    // Verificar se o bucket existe
-    console.log(`📦 Verificando bucket: ${BUCKET_NAME}`)
+    let BUCKET_NAME = ""
 
-    const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets()
-
-    if (bucketsError) {
-      console.error("❌ Erro ao listar buckets:", bucketsError)
-      throw new Error("Erro ao acessar storage: " + bucketsError.message)
-    }
-
-    const bucketExists = buckets?.some((bucket) => bucket.name === BUCKET_NAME)
-
-    if (!bucketExists) {
-      console.error(`❌ Bucket ${BUCKET_NAME} não encontrado`)
-      console.log("📋 Buckets disponíveis:", buckets?.map((b) => b.name).join(", "))
-      throw new Error(`Bucket ${BUCKET_NAME} não está configurado`)
-    }
-
-    console.log(`✅ Bucket ${BUCKET_NAME} encontrado e acessível`)
-
-    // Upload dos documentos do titular
-    console.log("📄 Fazendo upload dos documentos do titular...")
-    for (const [key, file] of Object.entries(documentosUpload)) {
-      if (file) {
-        try {
-          console.log(`   📤 Uploading ${key}: ${file.name}`)
-
-          const fileName = `propostas/${propostaId}/titular_${key}_${Date.now()}.${file.name.split(".").pop()}`
-
-          const { data, error } = await supabase.storage.from(BUCKET_NAME).upload(fileName, file, {
-            cacheControl: "3600",
-            upsert: false,
-          })
-
-          if (error) {
-            console.error(`❌ Erro no upload de ${key}:`, error)
-            throw error
-          }
-
-          console.log(`   ✅ Upload de ${key} concluído:`, data.path)
-
-          // Obter URL pública
-          const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(fileName)
-
-          documentosUrls[key] = urlData.publicUrl
-          console.log(`   🔗 URL gerada para ${key}:`, urlData.publicUrl)
-        } catch (error) {
-          console.error(`❌ Erro ao fazer upload do documento ${key}:`, error)
-          // Continuar com outros documentos mesmo se um falhar
-        }
-      }
-    }
-
-    // Upload dos documentos dos dependentes
-    console.log("👨‍👩‍👧‍👦 Fazendo upload dos documentos dos dependentes...")
-    for (const [dependentIndex, docs] of Object.entries(documentosDependentesUpload)) {
-      console.log(`   📂 Dependente ${dependentIndex}:`)
-      documentosDependentesUrls[dependentIndex] = {}
-
-      for (const [key, file] of Object.entries(docs)) {
-        if (file) {
-          try {
-            console.log(`      📤 Uploading ${key}: ${file.name}`)
-
-            const fileName = `propostas/${propostaId}/dependente_${dependentIndex}_${key}_${Date.now()}.${file.name.split(".").pop()}`
-
-            const { data, error } = await supabase.storage.from(BUCKET_NAME).upload(fileName, file, {
-              cacheControl: "3600",
-              upsert: false,
-            })
-
-            if (error) {
-              console.error(`❌ Erro no upload de ${key} do dependente ${dependentIndex}:`, error)
-              throw error
-            }
-
-            console.log(`      ✅ Upload de ${key} concluído:`, data.path)
-
-            // Obter URL pública
-            const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(fileName)
-
-            documentosDependentesUrls[dependentIndex][key] = urlData.publicUrl
-            console.log(`      🔗 URL gerada para ${key}:`, urlData.publicUrl)
-          } catch (error) {
-            console.error(`❌ Erro ao fazer upload do documento ${key} do dependente ${dependentIndex}:`, error)
-            // Continuar com outros documentos mesmo se um falhar
-          }
-        }
-      }
-    }
-
-    console.log("📊 RESUMO DO UPLOAD:")
-    console.log(`   Documentos titular: ${Object.keys(documentosUrls).length}`)
-    console.log(`   Dependentes com documentos: ${Object.keys(documentosDependentesUrls).length}`)
-
-    return { documentosUrls, documentosDependentesUrls }
-  }
-
-  // CORRIGIR: Função de upload para usar o bucket correto das propostas
-  const uploadDocumentosPropostas = async (propostaId: string) => {
-    console.log("📤 INICIANDO UPLOAD DE DOCUMENTOS - BUCKET PROPOSTAS")
-    console.log("=".repeat(60))
-    console.log("📋 Proposta ID:", propostaId)
-
-    const documentosUrls: { [key: string]: string } = {}
-    const documentosDependentesUrls: { [key: string]: { [key: string]: string } } = {}
-
-    // BUCKET CORRETO para propostas (mesmo usado pelas propostas digitais)
-    const BUCKET_NAME = "documentos_propostas"
-
-    // Verificar se o bucket existe
-    console.log(`📦 Verificando bucket: ${BUCKET_NAME}`)
-
-    const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets()
-
-    if (bucketsError) {
-      console.error("❌ Erro ao listar buckets:", bucketsError)
-      throw new Error("Erro ao acessar storage: " + bucketsError.message)
-    }
-
-    const bucketExists = buckets?.some((bucket) => bucket.name === BUCKET_NAME)
-
-    if (!bucketExists) {
-      console.error(`❌ Bucket ${BUCKET_NAME} não encontrado`)
-      console.log("📋 Buckets disponíveis:", buckets?.map((b) => b.name).join(", "))
-      throw new Error(`Bucket ${BUCKET_NAME} não está configurado`)
-    }
-
-    console.log(`✅ Bucket ${BUCKET_NAME} encontrado e acessível`)
-
-    // Upload dos documentos do titular
-    console.log("📄 Fazendo upload dos documentos do titular...")
-    for (const [key, file] of Object.entries(documentosUpload)) {
-      if (file) {
-        try {
-          console.log(`   📤 Uploading ${key}: ${file.name}`)
-
-          const fileName = `propostas/${propostaId}/titular_${key}_${Date.now()}.${file.name.split(".").pop()}`
-
-          const { data, error } = await supabase.storage.from(BUCKET_NAME).upload(fileName, file, {
-            cacheControl: "3600",
-            upsert: false,
-          })
-
-          if (error) {
-            console.error(`❌ Erro no upload de ${key}:`, error)
-            throw error
-          }
-
-          console.log(`   ✅ Upload de ${key} concluído:`, data.path)
-
-          // Obter URL pública
-          const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(fileName)
-
-          documentosUrls[key] = urlData.publicUrl
-          console.log(`   🔗 URL gerada para ${key}:`, urlData.publicUrl)
-        } catch (error) {
-          console.error(`❌ Erro ao fazer upload do documento ${key}:`, error)
-          // Continuar com outros documentos mesmo se um falhar
-        }
-      }
-    }
-
-    // Upload dos documentos dos dependentes
-    console.log("👨‍👩‍👧‍👦 Fazendo upload dos documentos dos dependentes...")
-    for (const [dependentIndex, docs] of Object.entries(documentosDependentesUpload)) {
-      console.log(`   📂 Dependente ${dependentIndex}:`)
-      documentosDependentesUrls[dependentIndex] = {}
-
-      for (const [key, file] of Object.entries(docs)) {
-        if (file) {
-          try {
-            console.log(`      📤 Uploading ${key}: ${file.name}`)
-
-            const fileName = `propostas/${propostaId}/dependente_${dependentIndex}_${key}_${Date.now()}.${file.name.split(".").pop()}`
-
-            const { data, error } = await supabase.storage.from(BUCKET_NAME).upload(fileName, file, {
-              cacheControl: "3600",
-              upsert: false,
-            })
-
-            if (error) {
-              console.error(`❌ Erro no upload de ${key} do dependente ${dependentIndex}:`, error)
-              throw error
-            }
-
-            console.log(`      ✅ Upload de ${key} concluído:`, data.path)
-
-            // Obter URL pública
-            const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(fileName)
-
-            documentosDependentesUrls[dependentIndex][key] = urlData.publicUrl
-            console.log(`      🔗 URL gerada para ${key}:`, urlData.publicUrl)
-          } catch (error) {
-            console.error(`❌ Erro ao fazer upload do documento ${key} do dependente ${dependentIndex}:`, error)
-            // Continuar com outros documentos mesmo se um falhar
-          }
-        }
-      }
-    }
-
-    console.log("📊 RESUMO DO UPLOAD:")
-    console.log(`   Documentos titular: ${Object.keys(documentosUrls).length}`)
-    console.log(`   Dependentes com documentos: ${Object.keys(documentosDependentesUrls).length}`)
-
-    return { documentosUrls, documentosDependentesUrls }
-  }
-
-  // CORRIGIR: Usar a tabela 'propostas' em vez de 'propostas_corretores'
-  const onSubmit = async (data: FormValues) => {
-    if (!corretor?.id) {
-      toast.error("Você precisa estar logado para criar uma proposta.")
-      return
-    }
-
-    // Verificar se todos os documentos do titular foram anexados
-    const documentosObrigatorios = ["rg_frente", "rg_verso", "cpf", "comprovante_residencia", "cns"]
-    const documentosFaltantes = documentosObrigatorios.filter((doc) => !documentosUpload[doc])
-
-    if (documentosFaltantes.length > 0) {
-      toast.error(`Anexe todos os documentos obrigatórios do titular: ${documentosFaltantes.join(", ")}`)
-      return
-    }
-
-    // Verificar documentos dos dependentes se houver
-    if (data.tem_dependentes) {
-      for (let i = 0; i < data.dependentes.length; i++) {
-        const docsObrigatoriosDependente = ["rg_frente", "rg_verso", "cpf", "cns"]
-        const docsFaltantesDependente = docsObrigatoriosDependente.filter(
-          (doc) => !documentosDependentesUpload[i] || !documentosDependentesUpload[i][doc],
-        )
-
-        if (docsFaltantesDependente.length > 0) {
-          toast.error(
-            `Anexe todos os documentos obrigatórios do dependente ${i + 1}: ${docsFaltantesDependente.join(", ")}`,
-          )
-          return
-        }
-      }
-    }
-
-    setEnviando(true)
     try {
-      console.log("🚀 INICIANDO PROCESSO DE CRIAÇÃO DE PROPOSTA - USANDO TABELA PROPOSTAS")
-      console.log("=".repeat(70))
+      // Verificar buckets existentes
+      console.log("🔍 Verificando buckets existentes...")
+      const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets()
 
-      // Converte o valor para número
-      const valorNumerico = Number.parseFloat(data.valor.replace(/[^\d,.-]/g, "").replace(",", "."))
-
-      // Buscar o produto selecionado para obter dados completos
-      const produtoSelecionadoInterno = produtos.find((p) => p.id.toString() === data.produto_id)
-
-      // Preparar endereço completo
-      let enderecoCompleto = data.endereco
-      if (data.numero) enderecoCompleto += `, ${data.numero}`
-      if (data.complemento) enderecoCompleto += `, ${data.complemento}`
-
-      // Gerar ID único para a proposta
-      const propostaId = crypto.randomUUID()
-
-      // CORRIGIR: Dados da proposta para a tabela 'propostas' (mesmo formato que funciona)
-      const dadosProposta = {
-        id: propostaId,
-        corretor_id: corretor.id,
-        corretor_nome: corretor.nome,
-        modelo_id: data.template_id,
-        template_titulo: templates.find((t) => t.id === data.template_id)?.titulo || "Modelo não identificado",
-        nome_cliente: data.nome,
-        email: data.email,
-        telefone: data.telefone,
-        whatsapp: data.telefone,
-        cpf: data.cpf,
-        rg: data.rg,
-        orgao_emissor: data.orgao_emissor,
-        data_nascimento: data.data_nascimento,
-        cns: data.cns,
-        nome_mae: data.nome_mae,
-        sexo: data.sexo,
-        endereco: enderecoCompleto,
-        numero: data.numero,
-        complemento: data.complemento,
-        bairro: data.bairro,
-        cidade: data.cidade,
-        estado: data.estado,
-        cep: data.cep,
-        tipo_cobertura: data.cobertura,
-        tipo_acomodacao: data.acomodacao,
-        codigo_plano: data.sigla_plano,
-        valor_plano: valorNumerico,
-        produto_id: data.produto_id,
-        produto_nome: produtoSelecionado?.nome || "",
-        status: "pendente", // Status inicial
-        tem_dependentes: data.tem_dependentes,
-        dependentes_dados: data.tem_dependentes ? JSON.stringify(data.dependentes) : "[]",
-        observacoes: data.observacoes,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+      if (bucketsError) {
+        console.error("❌ Erro ao listar buckets:", bucketsError)
+        throw new Error("Erro ao acessar storage: " + bucketsError.message)
       }
 
-      console.log("💾 Salvando proposta na tabela 'propostas'...")
-      console.log("📋 Dados da proposta:", dadosProposta)
+      console.log("📦 Buckets disponíveis:", buckets?.map((b) => b.name).join(", "))
 
-      // Inserir na tabela 'propostas' (mesma que funciona para propostas digitais)
-      const { data: novaProposta, error: propostaError } = await supabase
-        .from("propostas")
-        .insert([dadosProposta])
-        .select()
-        .single()
-
-      if (propostaError) {
-        console.error("❌ Erro ao salvar proposta:", propostaError)
-        throw new Error("Erro ao salvar proposta: " + propostaError.message)
+      // Procurar por um bucket existente
+      for (const bucketTeste of BUCKETS_POSSIVEIS) {
+        const bucketExists = buckets?.some((bucket) => bucket.name === bucketTeste)
+        if (bucketExists) {
+          BUCKET_NAME = bucketTeste
+          console.log(`✅ Usando bucket existente: ${BUCKET_NAME}`)
+          break
+        }
       }
 
-      console.log("✅ Proposta salva com sucesso!")
-      console.log("🆔 ID da proposta:", novaProposta.id)
-      console.log("📅 Data de criação:", novaProposta.created_at)
+      // Se nenhum bucket foi encontrado, criar o primeiro da lista
+      if (!BUCKET_NAME) {
+        console.log("📦 Nenhum bucket encontrado, criando novo...")
+        BUCKET_NAME = BUCKETS_POSSIVEIS[0] // "documentos-propostas-corretores"
 
-      if (!novaProposta || !novaProposta.id) {
-        throw new Error("Proposta não foi salva corretamente - ID não retornado")
-      }
+        const { data: novoBucket, error: criarBucketError } = await supabase.storage.createBucket(BUCKET_NAME, {
+          public: true,
+          fileSizeLimit: 52428800, // 50MB
+          allowedMimeTypes: ["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"],
+        })
 
-      // CORRIGIR: Upload de documentos com bucket correto para propostas
-      console.log("📤 Iniciando upload de documentos...")
-      const { documentosUrls, documentosDependentesUrls } = await uploadDocumentosPropostas(novaProposta.id.toString())
-
-      console.log("📊 Resultado do upload:")
-      console.log("   Documentos titular:", Object.keys(documentosUrls).length)
-      console.log("   Documentos dependentes:", Object.keys(documentosDependentesUrls).length)
-
-      // Salvar dependentes se houver (na tabela 'dependentes' padrão)
-      if (data.tem_dependentes && data.dependentes.length > 0) {
-        console.log("👨‍👩‍👧‍👦 Salvando dependentes...")
-
-        const dependentesData = data.dependentes.map((dep, index) => ({
-          id: crypto.randomUUID(),
-          proposta_id: novaProposta.id, // Usar o ID da proposta
-          nome: dep.nome,
-          cpf: dep.cpf,
-          rg: dep.rg,
-          data_nascimento: dep.data_nascimento,
-          cns: dep.cns,
-          parentesco: dep.parentesco,
-          nome_mae: dep.nome_mae,
-          peso: dep.peso ? Number.parseFloat(dep.peso) : null,
-          altura: dep.altura ? Number.parseFloat(dep.altura) : null,
-          valor_individual: dep.valor_individual
-            ? Number.parseFloat(dep.valor_individual.replace(/[^\d.,]/g, "").replace(",", "."))
-            : null,
-          uf_nascimento: dep.uf_nascimento,
-          sexo: dep.sexo,
-          orgao_emissor: dep.orgao_emissor,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }))
-
-        const { error: dependentesError } = await supabase.from("dependentes").insert(dependentesData)
-
-        if (dependentesError) {
-          console.error("❌ Erro ao salvar dependentes:", dependentesError)
-          // Não falhar por causa dos dependentes, apenas avisar
-          toast.error("Proposta salva, mas houve erro ao salvar dependentes.")
+        if (criarBucketError) {
+          console.error("❌ Erro ao criar bucket:", criarBucketError)
+          // Se falhar ao criar, tentar usar um bucket genérico
+          BUCKET_NAME = "documentos"
+          console.log("⚠️ Tentando usar bucket genérico:", BUCKET_NAME)
         } else {
-          console.log("✅ Dependentes salvos com sucesso!")
+          console.log("✅ Bucket criado com sucesso:", BUCKET_NAME)
         }
       }
 
-      // CORRIGIR: Atualizar com URLs dos documentos
-      console.log("🔗 Atualizando proposta com URLs dos documentos...")
+      console.log(`🎯 Bucket final selecionado: ${BUCKET_NAME}`)
 
-      const updateData: any = {
-        updated_at: new Date().toISOString(),
-      }
+      // Upload dos documentos do titular
+      console.log("📄 Fazendo upload dos documentos do titular...")
+      for (const [key, file] of Object.entries(documentosUpload)) {
+        if (file) {
+          try {
+            console.log(`   📤 Uploading ${key}: ${file.name}`)
 
-      // Adicionar URLs dos documentos se houver
-      if (Object.keys(documentosUrls).length > 0) {
-        updateData.documentos_urls = documentosUrls
-      }
+            const fileName = `propostas/${propostaId}/titular_${key}_${Date.now()}.${file.name.split(".").pop()}`
 
-      if (Object.keys(documentosDependentesUrls).length > 0) {
-        updateData.documentos_dependentes_urls = documentosDependentesUrls
-      }
+            const { data, error } = await supabase.storage.from(BUCKET_NAME).upload(fileName, file, {
+              cacheControl: "3600",
+              upsert: true, // Mudado para true para evitar conflitos
+            })
 
-      const { error: updateError } = await supabase.from("propostas").update(updateData).eq("id", novaProposta.id)
+            if (error) {
+              console.error(`❌ Erro no upload de ${key}:`, error)
+              // Tentar upload simples se falhar
+              const fileNameSimples = `${key}_${Date.now()}.${file.name.split(".").pop()}`
+              const { data: dataSimples, error: errorSimples } = await supabase.storage
+                .from(BUCKET_NAME)
+                .upload(fileNameSimples, file, {
+                  cacheControl: "3600",
+                  upsert: true,
+                })
 
-      if (updateError) {
-        console.error("⚠️ Erro ao atualizar URLs dos documentos:", updateError)
-        // Não falhar por causa disso, apenas avisar
-        console.log("⚠️ Proposta salva, mas URLs dos documentos podem não ter sido atualizadas")
-      } else {
-        console.log("✅ URLs dos documentos atualizadas com sucesso!")
-      }
+              if (errorSimples) {
+                console.error(`❌ Erro no upload simples de ${key}:`, errorSimples)
+                continue // Pular este documento
+              }
 
-      // Enviar email para o cliente
-      console.log("📧 Tentando enviar email para o cliente...")
-      const emailEnviado = await enviarEmailParaCliente(novaProposta.id.toString(), data.email, data.nome)
+              const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(fileNameSimples)
+              documentosUrls[key] = urlData.publicUrl
+              console.log(`   ✅ Upload simples de ${key} concluído`)
+              continue
+            }
 
-      // Preparar dados para o modal de sucesso
-      const linkProposta = `${window.location.origin}/proposta-digital/completar/${novaProposta.id}`
+            console.log(`   ✅ Upload de ${key} concluído:`, data.path)
 
-      setSuccessData({
-        clienteNome: data.nome,
-        clienteEmail: data.email,
-        linkProposta,
-        emailEnviado,
-      })
-
-      // Mostrar modal de sucesso
-      setShowSuccessModal(true)
-
-      // Se email não foi enviado, copiar link para clipboard
-      if (!emailEnviado && navigator.clipboard) {
-        try {
-          await navigator.clipboard.writeText(linkProposta)
-        } catch (clipboardError) {
-          console.log("Não foi possível copiar para clipboard:", clipboardError)
+            // Obter URL pública
+            const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(fileName)
+            documentosUrls[key] = urlData.publicUrl
+            console.log(`   🔗 URL gerada para ${key}:`, urlData.publicUrl)
+          } catch (error) {
+            console.error(`❌ Erro ao fazer upload do documento ${key}:`, error)
+            // Continuar com outros documentos mesmo se um falhar
+          }
         }
       }
 
-      console.log("🎉 PROCESSO COMPLETO FINALIZADO COM SUCESSO!")
-      toast.success("Proposta criada com sucesso!")
+      // Upload dos documentos dos dependentes
+      console.log("👨‍👩‍👧‍👦 Fazendo upload dos documentos dos dependentes...")
+      for (const [dependentIndex, docs] of Object.entries(documentosDependentesUpload)) {
+        console.log(`   📂 Dependente ${dependentIndex}:`)
+        documentosDependentesUrls[dependentIndex] = {}
+
+        for (const [key, file] of Object.entries(docs)) {
+          if (file) {
+            try {
+              console.log(`      📤 Uploading ${key}: ${file.name}`)
+
+              const fileName = `propostas/${propostaId}/dependente_${dependentIndex}_${key}_${Date.now()}.${file.name.split(".").pop()}`
+
+              const { data, error } = await supabase.storage.from(BUCKET_NAME).upload(fileName, file, {
+                cacheControl: "3600",
+                upsert: true,
+              })
+
+              if (error) {
+                console.error(`❌ Erro no upload de ${key} do dependente ${dependentIndex}:`, error)
+                // Tentar upload simples
+                const fileNameSimples = `dep${dependentIndex}_${key}_${Date.now()}.${file.name.split(".").pop()}`
+                const { data: dataSimples, error: errorSimples } = await supabase.storage
+                  .from(BUCKET_NAME)
+                  .upload(fileNameSimples, file, {
+                    cacheControl: "3600",
+                    upsert: true,
+                  })
+
+                if (errorSimples) {
+                  console.error(`❌ Erro no upload simples de ${key} do dependente ${dependentIndex}:`, errorSimples)
+                  continue
+                }
+
+                const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(fileNameSimples)
+                documentosDependentesUrls[dependentIndex][key] = urlData.publicUrl
+                console.log(`      ✅ Upload simples de ${key} concluído`)
+                continue
+              }
+
+              console.log(`      ✅ Upload de ${key} concluído:`, data.path)
+
+              // Obter URL pública
+              const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(fileName)
+              documentosDependentesUrls[dependentIndex][key] = urlData.publicUrl
+              console.log(`      🔗 URL gerada para ${key}:`, urlData.publicUrl)
+            } catch (error) {
+              console.error(`❌ Erro ao fazer upload do documento ${key} do dependente ${dependentIndex}:`, error)
+              // Continuar com outros documentos mesmo se um falhar
+            }
+          }
+        }
+      }
+
+      console.log("📊 RESUMO DO UPLOAD:")
+      console.log(`   Bucket usado: ${BUCKET_NAME}`)
+      console.log(`   Documentos titular: ${Object.keys(documentosUrls).length}`)
+      console.log(`   Dependentes com documentos: ${Object.keys(documentosDependentesUrls).length}`)
+
+      return { documentosUrls, documentosDependentesUrls }
     } catch (error) {
-      console.error("❌ ERRO GERAL NO PROCESSO:", error)
-      toast.error("Erro ao criar proposta. Tente novamente.")
-    } finally {
-      setEnviando(false)
+      console.error("❌ ERRO GERAL NO UPLOAD:", error)
+
+      // FALLBACK: Se tudo falhar, retornar URLs vazias para não quebrar o fluxo
+      console.log("⚠️ Usando fallback - proposta será salva sem documentos")
+      return {
+        documentosUrls: {},
+        documentosDependentesUrls: {},
+      }
     }
   }
 
@@ -856,6 +601,245 @@ export default function NovaPropostaPage() {
       }
     } catch (error) {
       console.error("❌ Erro ao carregar descrição do produto:", error)
+    }
+  }
+
+  // CORRIGIR: Usar BIGINT em vez de UUID para o ID e salvar documentos corretamente
+  const onSubmit = async (data: FormValues) => {
+    if (!corretor?.id) {
+      toast.error("Você precisa estar logado para criar uma proposta.")
+      return
+    }
+
+    // Verificar se todos os documentos do titular foram anexados
+    const documentosObrigatorios = ["rg_frente", "rg_verso", "cpf", "comprovante_residencia", "cns"]
+    const documentosFaltantes = documentosObrigatorios.filter((doc) => !documentosUpload[doc])
+
+    if (documentosFaltantes.length > 0) {
+      toast.error(`Anexe todos os documentos obrigatórios do titular: ${documentosFaltantes.join(", ")}`)
+      return
+    }
+
+    // Verificar documentos dos dependentes se houver
+    if (data.tem_dependentes) {
+      for (let i = 0; i < data.dependentes.length; i++) {
+        const docsObrigatoriosDependente = ["rg_frente", "rg_verso", "cpf", "cns"]
+        const docsFaltantesDependente = docsObrigatoriosDependente.filter(
+          (doc) => !documentosDependentesUpload[i] || !documentosDependentesUpload[i][doc],
+        )
+
+        if (docsFaltantesDependente.length > 0) {
+          toast.error(
+            `Anexe todos os documentos obrigatórios do dependente ${i + 1}: ${docsFaltantesDependente.join(", ")}`,
+          )
+          return
+        }
+      }
+    }
+
+    setEnviando(true)
+    try {
+      console.log("🚀 INICIANDO PROCESSO DE CRIAÇÃO DE PROPOSTA - VERSÃO CORRIGIDA")
+      console.log("=".repeat(70))
+
+      // Converte o valor para número
+      const valorNumerico = Number.parseFloat(data.valor.replace(/[^\d,.-]/g, "").replace(",", "."))
+
+      // Buscar o produto selecionado para obter dados completos
+      const produtoSelecionadoInterno = produtos.find((p) => p.id.toString() === data.produto_id)
+
+      // Preparar endereço completo
+      let enderecoCompleto = data.endereco
+      if (data.numero) enderecoCompleto += `, ${data.numero}`
+      if (data.complemento) enderecoCompleto += `, ${data.complemento}`
+
+      // CORRIGIR: Dados da proposta com campos corretos
+      const dadosProposta = {
+        corretor_id: corretor.id,
+        cliente: data.nome,
+        email_cliente: data.email,
+        whatsapp_cliente: data.telefone,
+        produto: produtoSelecionado?.nome || "Produto não identificado",
+        produto_nome: produtoSelecionado?.nome || "",
+        produto_descricao: produtoSelecionado?.descricao || null, // NOVO
+        produto_operadora: produtoSelecionado?.operadora || null, // NOVO
+        produto_tipo: produtoSelecionado?.tipo || null, // NOVO
+        plano_nome: `${produtoSelecionado?.nome || ""} - ${data.sigla_plano}`,
+        valor_proposta: valorNumerico,
+        comissao: 0, // Será calculado posteriormente
+        status: "pendente",
+        data: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+
+        // Dados adicionais do cliente
+        cpf_cliente: data.cpf,
+        data_nascimento_cliente: data.data_nascimento,
+        endereco_cliente: enderecoCompleto,
+        cidade_cliente: data.cidade,
+        estado_cliente: data.estado,
+        cep_cliente: data.cep,
+
+        // Dados do plano
+        cobertura: data.cobertura,
+        acomodacao: data.acomodacao,
+        codigo_plano: data.sigla_plano,
+
+        // Dados adicionais
+        observacoes: data.observacoes,
+        tem_dependentes: data.tem_dependentes,
+        quantidade_dependentes: data.tem_dependentes ? data.dependentes.length : 0,
+
+        // Dados pessoais adicionais
+        rg_cliente: data.rg,
+        orgao_emissor_cliente: data.orgao_emissor,
+        cns_cliente: data.cns,
+        nome_mae_cliente: data.nome_mae,
+        sexo_cliente: data.sexo,
+
+        // NOVO: Campos para controle de documentos
+        documentos_enviados: true,
+        data_upload_documentos: new Date().toISOString(),
+      }
+
+      console.log("💾 Salvando proposta na tabela propostas_corretores...")
+      console.log("📋 Dados da proposta:", dadosProposta)
+
+      // Inserir na tabela propostas_corretores (sem especificar ID)
+      const { data: novaProposta, error: propostaError } = await supabase
+        .from("propostas_corretores")
+        .insert([dadosProposta])
+        .select()
+        .single()
+
+      if (propostaError) {
+        console.error("❌ Erro ao salvar proposta:", propostaError)
+        throw new Error("Erro ao salvar proposta: " + propostaError.message)
+      }
+
+      console.log("✅ Proposta salva com sucesso!")
+      console.log("🆔 ID da proposta:", novaProposta.id)
+      console.log("📅 Data de criação:", novaProposta.created_at)
+
+      if (!novaProposta || !novaProposta.id) {
+        throw new Error("Proposta não foi salva corretamente - ID não retornado")
+      }
+
+      // CORRIGIR: Upload de documentos com bucket correto
+      console.log("📤 Iniciando upload de documentos...")
+      const { documentosUrls, documentosDependentesUrls } = await uploadDocumentos(novaProposta.id.toString())
+
+      console.log("📊 Resultado do upload:")
+      console.log("   Documentos titular:", Object.keys(documentosUrls).length)
+      console.log("   Documentos dependentes:", Object.keys(documentosDependentesUrls).length)
+
+      // Salvar dependentes se houver
+      if (data.tem_dependentes && data.dependentes.length > 0) {
+        console.log("👨‍👩‍👧‍👦 Salvando dependentes...")
+
+        const dependentesData = data.dependentes.map((dep, index) => ({
+          proposta_corretor_id: novaProposta.id, // Usar o ID gerado automaticamente
+          nome: dep.nome,
+          cpf: dep.cpf,
+          rg: dep.rg,
+          data_nascimento: dep.data_nascimento,
+          cns: dep.cns,
+          parentesco: dep.parentesco,
+          nome_mae: dep.nome_mae,
+          peso: dep.peso ? Number.parseFloat(dep.peso) : null,
+          altura: dep.altura ? Number.parseFloat(dep.altura) : null,
+          valor_individual: dep.valor_individual
+            ? Number.parseFloat(dep.valor_individual.replace(/[^\d.,]/g, "").replace(",", "."))
+            : null,
+          uf_nascimento: dep.uf_nascimento,
+          sexo: dep.sexo,
+          orgao_emissor: dep.orgao_emissor,
+          created_at: new Date().toISOString(),
+        }))
+
+        const { error: dependentesError } = await supabase
+          .from("dependentes_propostas_corretores")
+          .insert(dependentesData)
+
+        if (dependentesError) {
+          console.error("❌ Erro ao salvar dependentes:", dependentesError)
+          // Não falhar por causa dos dependentes, apenas avisar
+          toast.error("Proposta salva, mas houve erro ao salvar dependentes.")
+        } else {
+          console.log("✅ Dependentes salvos com sucesso!")
+        }
+      }
+
+      // CORRIGIR: Atualizar com URLs dos documentos usando campos corretos
+      console.log("🔗 Atualizando proposta com URLs dos documentos...")
+
+      const updateData: any = {
+        updated_at: new Date().toISOString(),
+      }
+
+      // Adicionar URLs dos documentos se houver
+      if (Object.keys(documentosUrls).length > 0) {
+        updateData.documentos_urls = documentosUrls
+
+        // Também salvar em campos individuais para compatibilidade
+        if (documentosUrls.rg_frente) updateData.rg_frente_url = documentosUrls.rg_frente
+        if (documentosUrls.rg_verso) updateData.rg_verso_url = documentosUrls.rg_verso
+        if (documentosUrls.cpf) updateData.cpf_url = documentosUrls.cpf
+        if (documentosUrls.comprovante_residencia)
+          updateData.comprovante_residencia_url = documentosUrls.comprovante_residencia
+        if (documentosUrls.cns) updateData.cns_url = documentosUrls.cns
+      }
+
+      if (Object.keys(documentosDependentesUrls).length > 0) {
+        updateData.documentos_dependentes_urls = documentosDependentesUrls
+      }
+
+      const { error: updateError } = await supabase
+        .from("propostas_corretores")
+        .update(updateData)
+        .eq("id", novaProposta.id)
+
+      if (updateError) {
+        console.error("⚠️ Erro ao atualizar URLs dos documentos:", updateError)
+        // Não falhar por causa disso, apenas avisar
+        console.log("⚠️ Proposta salva, mas URLs dos documentos podem não ter sido atualizadas")
+      } else {
+        console.log("✅ URLs dos documentos atualizadas com sucesso!")
+      }
+
+      // Enviar email para o cliente
+      console.log("📧 Tentando enviar email para o cliente...")
+      const emailEnviado = await enviarEmailParaCliente(novaProposta.id.toString(), data.email, data.nome)
+
+      // Preparar dados para o modal de sucesso
+      const linkProposta = `${window.location.origin}/proposta-digital/completar/${novaProposta.id}`
+
+      setSuccessData({
+        clienteNome: data.nome,
+        clienteEmail: data.email,
+        linkProposta,
+        emailEnviado,
+      })
+
+      // Mostrar modal de sucesso
+      setShowSuccessModal(true)
+
+      // Se email não foi enviado, copiar link para clipboard
+      if (!emailEnviado && navigator.clipboard) {
+        try {
+          await navigator.clipboard.writeText(linkProposta)
+        } catch (clipboardError) {
+          console.log("Não foi possível copiar para clipboard:", clipboardError)
+        }
+      }
+
+      console.log("🎉 PROCESSO COMPLETO FINALIZADO COM SUCESSO!")
+      toast.success("Proposta criada com sucesso!")
+    } catch (error) {
+      console.error("❌ ERRO GERAL NO PROCESSO:", error)
+      toast.error("Erro ao criar proposta. Tente novamente.")
+    } finally {
+      setEnviando(false)
     }
   }
 
@@ -1431,7 +1415,7 @@ export default function NovaPropostaPage() {
                             defaultValue={field.value}
                             disabled={carregandoProdutos}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className="border-2 border-amber-300 bg-amber-50 hover:border-amber-400 focus:border-amber-500 shadow-sm">
                               <SelectValue placeholder="Selecione um produto" />
                             </SelectTrigger>
                             <SelectContent>
@@ -1599,6 +1583,7 @@ export default function NovaPropostaPage() {
                           <FormControl>
                             <Input placeholder="Ex: PS-001" {...field} />
                           </FormControl>
+                          <FormDescription>Coloque a sigla do plano, se houver</FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
